@@ -1,0 +1,214 @@
+
+
+You are**: a senior full-stack engineer, solutions architect, cybersecurity engineer, and business analyst.
+**Deliver**: a running web app in this Replit, with secure defaults, clean UI, tests, seed data, and docs.
+
+## 1) Business Goal
+
+Digitize the reception logbook for a university residence. Reception staff record when a student borrows an item (e.g., HDMI cable, calculator), where it will be used (e.g., Study Room), specs/notes, whether their student card was received, and when the item is returned. Managers need oversight, reporting, and audit trails.
+
+## 2) Personas & Roles
+
+* **Receptionist (Clerk)**: create sign-outs, mark returns, view current outstanding items.
+* **Residence Manager (Admin)**: full CRUD on items, view reports, export, manage users & permissions, view audit logs.
+* **Auditor (Read-only)**: view records, filters, and audit logs only.
+
+Implement **RBAC** with roles: `ADMIN`, `CLERK`, `AUDITOR`.
+
+## 3) Tech Stack (opinionated, secure)
+
+* **Backend**: Node.js + TypeScript, **Express**.
+* **DB/ORM**: **SQLite** + **Prisma** for dev; allow easy switch to Postgres via env (`DATABASE_URL`).
+* **Auth**: **JWT (short-lived access) + HTTP-only secure refresh cookies**, bcrypt password hashing.
+* **Validation**: **Zod** for request schemas.
+* **Rate limiting**: express-rate-limit.
+* **Frontend**: React + TypeScript + Vite, **shadcn/ui** + Tailwind for accessible components.
+* **State/query**: React Query.
+* **Testing**: Vitest (frontend), Jest (backend), Supertest for APIs.
+* **Logging**: Pino (JSON logs).
+* **Docs**: README + OpenAPI (Swagger UI route `/docs`).
+
+## 4) Data Model (Prisma)
+
+Create these tables with indexes and relations:
+
+* **User**: `id`, `email` (unique, lowercase), `passwordHash`, `role` (enum), `createdAt`, `lastLoginAt`, `isActive`.
+* **Student**: `id`, `studentNo` (unique), `name`, `surname`, `roomNo`, `createdAt`.
+* **Item**: `id`, `name`, `category`, `specification` (text), `assetTag` (unique, optional), `isActive`, `createdAt`.
+* **Loan**: `id`, `studentId` FK, `itemId` FK, `destination` (e.g., “Study Room 1”),
+  `cardReceived` (boolean), `takenAt` (datetime, default now), `returnedAt` (nullable),
+  `status` enum: `TAKEN|RETURNED|OVERDUE`, `notes` (optional), `createdByUserId` FK, `closedByUserId` FK nullable.
+  Index on (`status`, `takenAt`), (`studentId`), (`itemId`).
+* **AuditLog**: `id`, `actorUserId` FK, `action` (enum: USER\_LOGIN, USER\_CREATE, ITEM\_CREATE, LOAN\_CREATE, LOAN\_RETURN, EXPORT, SETTINGS\_CHANGE, etc.), `entity` (table), `entityId`, `ip`, `userAgent`, `at` (datetime), `diff` (JSON).
+
+Add computed/maintained **OVERDUE** status via a scheduled job (see §9) comparing `takenAt` with policy hours (default 4h, configurable).
+
+## 5) Core Use Cases & Acceptance Criteria
+
+1. **Create Loan (Clerk)**
+
+   * Enter Student (search by student no / name; create if not exists).
+   * Select Item (only active & not currently loaned).
+   * Enter destination, optional notes/specs reference, toggle “Student card received”.
+   * On submit: create `Loan` with `takenAt=now`, `status=TAKEN`, `createdByUserId`.
+   * **AC**: form validates; duplicate open loan for same item blocked; success toast; audit record.
+
+2. **Return Loan (Clerk)**
+
+   * From “Currently Out” table, click Return → set `returnedAt=now`, `status=RETURNED`, `closedByUserId`.
+   * **AC**: cannot return twice; audit record.
+
+3. **Manager Dash (Admin)**
+
+   * KPIs: Items out now, Overdue count, Avg loan duration (today/7d/30d), Top 10 most borrowed.
+   * Filters by date, student, item, status.
+   * Exports CSV/PDF (server-side).
+   * **AC**: export recorded to AuditLog.
+
+4. **User & Item Admin (Admin)**
+
+   * CRUD Items, toggle active.
+   * CRUD Users (set role, reset password, activate/deactivate).
+   * **AC**: validations, audit logs.
+
+5. **Audit & Reports (Admin/Auditor)**
+
+   * Immutable audit timeline with filters (actor, action, date).
+   * **AC**: entries are append-only; no edit/delete in UI.
+
+## 6) API Design (Express + Zod + JWT)
+
+Prefix all routes with `/api`. Add `X-Request-Id` middleware.
+
+* **Auth**
+
+  * `POST /auth/login` → {accessToken} + set `refreshToken` cookie (HttpOnly, Secure, SameSite=Strict).
+  * `POST /auth/refresh` → rotate tokens; revoke old on logout.
+  * `POST /auth/logout`.
+* **Students**
+
+  * `GET /students?query=` (search), `POST /students`, `PUT /students/:id`, `GET /students/:id`.
+* **Items**
+
+  * `GET /items`, `POST /items` (ADMIN), `PUT /items/:id` (ADMIN).
+* **Loans**
+
+  * `GET /loans?status=&from=&to=&studentId=&itemId=`
+  * `POST /loans` (create loan)
+  * `POST /loans/:id/return`
+* **Users** (ADMIN)
+
+  * `GET /users`, `POST /users`, `PUT /users/:id`, `POST /users/:id/reset-password`.
+* **Audit**
+
+  * `GET /audit?actor=&action=&from=&to=`
+* **Misc**
+
+  * `GET /health` (no auth), `GET /me`, `GET /stats/overview` (ADMIN)
+* Add **OpenAPI** docs at `/docs`.
+
+All mutating endpoints: validate with Zod, enforce RBAC middleware, write AuditLog.
+
+## 7) Frontend (React + shadcn + Tailwind)
+
+Pages:
+
+* **/login**: email, password; lockout after 5 failed attempts (backend).
+* **/** (role-aware landing):
+
+  * Clerk view: “New Loan” form (top), “Currently Out” table (below) with search, quick Return action.
+  * Admin view: Manager dashboard cards + quick links.
+* **/loans**: advanced filters, export.
+* **/items**: list, create, edit, activate/deactivate.
+* **/students**: list/search, create/edit.
+* **/users** (ADMIN).
+* **/audit** (ADMIN/AUDITOR).
+
+UI details:
+
+* Use accessible form components, keyboard shortcuts:
+
+  * `Ctrl+K` to open student/item fuzzy finder (client hits `/students?query=`).
+* Table features: sticky header, column filters, pagination, status badges (TAKEN/OVERDUE/RETURNED).
+* Toasts for success/error, inline validation messages.
+
+## 8) Security Requirements (implement all)
+
+* **Passwords**: bcrypt with cost 12+.
+* **JWT**: 10-minute access tokens; refresh rotation every 24h; on refresh reuse detection, revoke all.
+* **Cookies**: HttpOnly, Secure, SameSite=Strict; set `__Host-` prefix on production.
+* **CORS**: strict origin (env `CORS_ORIGIN`).
+* **Rate limits**:
+
+  * `/auth/*`: 5/min per IP & user.
+  * Other POST/PUT: 60/min per IP.
+* **Input validation**: Zod schemas; reject unknown keys.
+* **Output encoding**: never render raw JSON into HTML dangerously.
+* **Headers**: Helmet with CSP (self + data: for icons), disable `x-powered-by`.
+* **RBAC** middleware + ownership checks.
+* **Logging**: Pino JSON with redaction for secrets and PII (`password`, `refreshToken`).
+* **Audit**: append-only table; expose via read-only API; no delete endpoints.
+* **Secrets**: read from `.env` only; include `.env.example`.
+* **Backups**: nightly Prisma dump to `/data/backups` (keep 7 days).
+* **Account lockout**: after 5 failed logins for 15 min; record IP + UA.
+* **CSRF**: use SameSite=Strict refresh cookie + CSRF token for state-changing requests if running same-site.
+* **Overdue policy**: configurable `MAX_LOAN_HOURS` (default 4).
+* **PII minimization**: store only needed student fields.
+
+## 9) Jobs / Scheduling
+
+* Lightweight scheduler (node-cron): every 10 minutes mark loans **OVERDUE** when `now - takenAt > MAX_LOAN_HOURS` and `returnedAt IS NULL`.
+* Nightly backup (see §8).
+* Daily email summary (optional) to Admin: items out, overdue list (stub provider).
+
+## 10) Developer Experience
+
+* **Monorepo** in Replit with `apps/server` and `apps/web`.
+* Root scripts:
+
+  * `dev`: concurrently run web and server.
+  * `test`: run both test suites.
+  * `build`: typecheck + build.
+* **Prisma**: `prisma migrate dev` on first run; seed script creates:
+
+  * Admin user: `admin@example.com / Admin!234` (force change on first login).
+  * A few students, items, and 3 open loans.
+* **OpenAPI**: autogen spec from route schemas; serve Swagger UI.
+
+## 11) Testing
+
+* Backend: Jest + Supertest for all routes (auth, happy/edge paths, RBAC, rate limits).
+* Frontend: Vitest + React Testing Library for form validation, table filters, return flow.
+* Include a minimal **threat-model test** (e.g., attempt to return a loan twice, escalate role, bypass rate limit).
+
+## 12) Observability
+
+* `/health` returns app, db, migrations status.
+* Structured logs with requestId, userId (if any), action.
+* Simple in-app **Admin > Settings > System** page showing env, versions, and last backup timestamp.
+
+## 13) Deployment in Replit
+
+* Single `npm run dev` to start both (use `concurrently`).
+* Store SQLite at `/data/app.db` so it persists; ensure folder exists.
+* Provide `README.md` with: setup, env vars, roles, backup/restore, and security notes.
+
+## 14) Nice-to-Have (if time permits)
+
+* 2FA (TOTP) for Admins.
+* Barcode/QR scan for student cards and items.
+* Import students/items from CSV.
+* LDAP/SAML placeholder service for future campus SSO.
+* Webhook on overdue → send email/Teams message.
+
+## 15) Acceptance Checklist (DoD)
+
+* [ ] Login works with lockout and token rotation.
+* [ ] Create/return loan flow passes tests.
+* [ ] Overdue job updates statuses.
+* [ ] Audit logs populate for all sensitive actions.
+* [ ] Exports produce CSV/PDF and are audited.
+* [ ] RBAC enforced; unauthorized tests fail as expected.
+* [ ] README + `.env.example` included.
+
+**Now generate the full codebase, Prisma schema, seed script, env scaffolding, and tests. Start the server and UI so I can use it immediately in Replit.**
