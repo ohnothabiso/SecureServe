@@ -1,0 +1,19 @@
+{
+  "name": "amber-sa",
+  "version": "1.0.0",
+  "description": "Amber Alert system for South Africa - Geo-targeted community alert system",
+  "main": "index.js",
+  "scripts": {
+    "install:all": "npm install && cd mobile && npm install && cd ../admin-dashboard && npm install && cd ../functions && npm install",
+    "seed": "cd seed && npm run seed",
+    "dev:mobile": "cd mobile && npm start",
+    "dev:admin": "cd admin-dashboard && npm run dev",
+    "dev:functions": "cd functions && npm run serve",
+    "build:admin": "cd admin-dashboard && npm run build",
+    "deploy:functions": "cd functions && npm run deploy",
+    "deploy:admin": "cd admin-dashboard && npm run build && firebase deploy --only hosting"
+  },
+  "keywords": ["amber-alert", "south-africa", "emergency", "notifications", "react-native", "firebase"],
+  "author": "AmberSA Team",
+  "license": "MIT"
+}
