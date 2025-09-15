@@ -1,0 +1,38 @@
+{
+  "name": "amber-sa",
+  "version": "1.0.0",
+  "description": "Amber Alert System for South Africa",
+  "main": "index.js",
+  "scripts": {
+    "install:all": "npm run install:mobile && npm run install:admin && npm run install:functions && npm run install:seed",
+    "install:mobile": "cd mobile && npm install",
+    "install:admin": "cd admin-dashboard && npm install",
+    "install:functions": "cd functions && npm install",
+    "install:seed": "cd seed && npm install",
+    "start:emulators": "firebase emulators:start",
+    "start:mobile": "cd mobile && expo start",
+    "start:admin": "cd admin-dashboard && npm run dev",
+    "seed": "cd seed && npm run seed",
+    "test": "npm run test:mobile && npm run test:admin && npm run test:functions",
+    "test:mobile": "cd mobile && npm test",
+    "test:admin": "cd admin-dashboard && npm test",
+    "test:functions": "cd functions && npm test",
+    "build:admin": "cd admin-dashboard && npm run build",
+    "deploy:functions": "firebase deploy --only functions",
+    "deploy:admin": "firebase deploy --only hosting",
+    "deploy:all": "npm run deploy:functions && npm run deploy:admin"
+  },
+  "keywords": [
+    "amber-alert",
+    "south-africa",
+    "react-native",
+    "firebase",
+    "emergency",
+    "community-safety"
+  ],
+  "author": "AmberSA Team",
+  "license": "MIT",
+  "devDependencies": {
+    "firebase-tools": "^13.0.0"
+  }
+}

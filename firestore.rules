@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection rules
+    match /users/{userId} {
+      // Allow users to read their own profile
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // Allow users to update their own profile (except role and verified fields)
+      allow update: if request.auth != null && request.auth.uid == userId
+        && !('role' in request.resource.data)
+        && !('verified' in request.resource.data);
+      // Allow admins to update any user profile
+      allow update: if request.auth != null 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.verified == true;
+      // Allow creation of user profiles during registration
+      allow create: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Alerts collection rules
+    match /alerts/{alertId} {
+      // Allow authenticated users to read all alerts
+      allow read: if request.auth != null;
+      // Only verified admins can create alerts
+      allow create: if request.auth != null 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.verified == true;
+      // Only the creator or verified admins can update alerts
+      allow update: if request.auth != null 
+        && (resource.data.createdBy == request.auth.uid
+          || (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.verified == true));
+    }
+
+    // Sightings collection rules
+    match /sightings/{sightingId} {
+      // Allow authenticated users to read all sightings
+      allow read: if request.auth != null;
+      // Allow any authenticated user to create sightings
+      allow create: if request.auth != null;
+      // Users can update their own sightings
+      allow update: if request.auth != null && resource.data.reportedBy == request.auth.uid;
+    }
+
+    // Admin verifications collection rules
+    match /admin_verifications/{userId} {
+      // Only verified admins can read verifications
+      allow read: if request.auth != null 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.verified == true;
+      // Only verified admins can create/update verifications
+      allow write: if request.auth != null 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.verified == true;
+    }
+
+    // Message logs collection (for mock mode)
+    match /message_logs/{logId} {
+      // Only verified admins can read message logs
+      allow read: if request.auth != null 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.verified == true;
+      // Cloud Functions can write to message logs
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+  }
+}

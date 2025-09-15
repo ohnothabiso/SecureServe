@@ -1,0 +1,66 @@
+{
+  "expo": {
+    "name": "AmberSA",
+    "slug": "amber-sa",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ambersa.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "AmberSA needs location access to show relevant alerts and allow you to report sightings.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "AmberSA needs location access to show relevant alerts and allow you to report sightings.",
+        "NSPhotoLibraryUsageDescription": "AmberSA needs photo access to allow you to report sightings with photos."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.ambersa.mobile",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "CAMERA"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#ffffff",
+          "defaultChannel": "amber-alerts"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "AmberSA needs location access to show relevant alerts and allow you to report sightings."
+        }
+      ]
+    ],
+    "scheme": "amberapp",
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id"
+      }
+    }
+  }
+}
